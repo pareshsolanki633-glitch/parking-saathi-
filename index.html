@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parking Saathi</title>
+  <style>
+    :root { --blue:#1457c5; --navy:#12315c; --bg:#f3f6fb; --border:#dce4ef; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:#172033; }
+    header { background:linear-gradient(120deg,var(--navy),var(--blue)); color:#fff; padding:22px 18px; }
+    header h1 { margin:0 0 5px; font-size:25px; }
+    header p { margin:0; opacity:.9; }
+    main { width:min(920px,92%); margin:28px auto; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:22px; box-shadow:0 5px 20px #17365d0d; margin-bottom:18px; }
+    h2 { margin:0 0 16px; font-size:21px; }
+    label { display:block; font-weight:600; margin:13px 0 6px; }
+    input,select { width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:8px; font-size:16px; background:#fff; }
+    button { border:0; border-radius:8px; padding:12px 16px; font-size:15px; font-weight:700; cursor:pointer; background:var(--blue); color:#fff; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .primary { width:100%; margin-top:18px; }
+    .muted { color:#64748b; font-size:13px; line-height:1.5; }
+    .message { margin-top:14px; padding:11px 12px; border-radius:8px; display:none; white-space:pre-wrap; }
+    .error { display:block; background:#fff0f0; color:#a21d1d; }
+    .success { display:block; background:#eaf8ef; color:#176534; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; }
+    .stat { padding:16px; border-radius:10px; background:#f1f6ff; }
+    .stat strong { display:block; font-size:19px; margin-bottom:5px; }
+    .hidden { display:none !important; }
+    .toprow { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Parking Saathi</h1>
+  <p>QR Parking Management System</p>
+</header>
+
+<main>
+  <section id="loginCard" class="card">
+    <h2>Admin / Team Login</h2>
+    <form id="loginForm">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="loginButton" class="primary" type="submit">Login</button>
+      <div id="loginMessage" class="message" role="status"></div>
+    </form>
+    <p class="muted">Login uses the Apps Script function <code>parkingSaathiCheckUser(username, password)</code>. Open this page from the deployed Apps Script web-app URL.</p>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <div class="card">
+      <div class="toprow">
+        <div><h2>Dashboard</h2><div id="welcome"></div></div>
+        <button id="logoutButton" type="button">Logout</button>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card stat"><strong>QR Management</strong><span>Generate, search, download and reprint QR codes.</span></div>
+      <div class="card stat"><strong>Owner Registration</strong><span>Register owner and link a QR ID.</span></div>
+      <div class="card stat"><strong>Payments & Renewals</strong><span>Record confirmed payments and renew subscriptions.</span></div>
+      <div class="card stat"><strong>Reports</strong><span>Review team activity, registrations and collections.</span></div>
+    </div>
+    <div class="card">
+      <h2>Next modules</h2>
+      <p>The login connection is set up here. The QR, registration, payment and reporting screens must be connected to their matching server-side Apps Script functions before those operations can work.</p>
+      <p class="muted">This page does not change your Google Sheet or create another Admin account.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+  const loginForm = document.getElementById('loginForm');
+  const loginButton = document.getElementById('loginButton');
+  const loginMessage = document.getElementById('loginMessage');
+
+  function showMessage(element, text, kind) {
+    element.textContent = text;
+    element.className = 'message ' + kind;
+  }
+
+  loginForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      showMessage(loginMessage, 'Username aur password dono bhariye.', 'error');
+      return;
+    }
+
+    if (!window.google || !google.script || !google.script.run) {
+      showMessage(loginMessage, 'Yeh page Apps Script web-app se kholiye. Direct HTML file se login connect nahi hoga.', 'error');
+      return;
+    }
+
+    loginButton.disabled = true;
+    loginButton.textContent = 'Checking...';
+    loginMessage.className = 'message';
+    google.script.run
+      .withSuccessHandler(function (result) {
+        loginButton.disabled = false;
+        loginButton.textContent = 'Login';
+        if (result && result.success) {
+          const user = result.user || {};
+          document.getElementById('loginCard').classList.add('hidden');
+          document.getElementById('dashboard').classList.remove('hidden');
+          document.getElementById('welcome').textContent =
+            'Welcome, ' + (user.name || user.username || username) +
+            (user.role ? ' · ' + user.role : '');
+          document.getElementById('password').value = '';
+        } else {
+          showMessage(loginMessage,
+            (result && (result.message || result.error)) || 'Login failed. Username/password ya Users sheet settings check karein.',
+            'error');
+        }
+      })
+      .withFailureHandler(function (error) {
+        loginButton.disabled = false;
+        loginButton.textContent = 'Login';
+        showMessage(loginMessage,
+          'Server error: ' + (error && error.message ? error.message : String(error)),
+          'error');
+      })
+      .parkingSaathiCheckUser(username, password);
+  });
+
+  document.getElementById('logoutButton').addEventListener('click', function () {
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('loginCard').classList.remove('hidden');
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    loginMessage.className = 'message';
+  });
+</script>
+</body>
+</html>
